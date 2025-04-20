@@ -25,15 +25,15 @@ func NewAnimeClient() *AnimeClient {
 }
 
 type Anime struct {
-	ID       int `json:""`
-	URL      string
-	Title    string
-	Images   Images
-	Episodes int
-	Score    float64
-	Aired    Aired
-	Genres   []Genre
-	Synopsis string
+	ID       int     `json:"id"`
+	URL      string  `json:"url"`
+	Title    string  `json:"title"`
+	Images   Images  `json:"images"`
+	Episodes int     `json:"episodes"`
+	Score    float64 `json:"score"`
+	Aired    Aired   `json:"aired"`
+	Genres   []Genre `json:"genres"`
+	Synopsis string  `json:"synopsis"`
 }
 
 type Images struct {
