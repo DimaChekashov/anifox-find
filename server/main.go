@@ -26,7 +26,7 @@ func NewAnimeClient() *AnimeClient {
 }
 
 type Anime struct {
-	ID       int     `json:"id"`
+	ID       int     `json:"mal_id"`
 	URL      string  `json:"url"`
 	Title    string  `json:"title"`
 	Images   Images  `json:"images"`
