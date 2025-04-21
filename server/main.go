@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"os"
 	"time"
 )
 
@@ -102,5 +103,15 @@ func main() {
 		log.Fatalf("Error getting anime: %v", err)
 	}
 
-	fmt.Print(anime)
+	data, err := json.MarshalIndent(anime, "", " ")
+	if err != nil {
+		log.Fatalf("Error json encoding: %v", err)
+	}
+
+	err = os.WriteFile("anime.json", data, 0644)
+	if err != nil {
+		log.Fatalf("Error writing to file: %v", err)
+	}
+
+	log.Println("The data successfully writen into anime.json")
 }
