@@ -95,15 +95,36 @@ func (c *AnimeClient) GetAnimeByID(ctx context.Context, id int) (*Anime, error) 
 func main() {
 	client := NewAnimeClient()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	anime, err := client.GetAnimeByID(ctx, 1)
-	if err != nil {
-		log.Fatalf("Error getting anime: %v", err)
+	animeList := []Anime{}
+	var successCount, failCount int
+
+	for i := 1; i <= 20; i++ {
+		if i > 1 {
+			time.Sleep(350 * time.Millisecond)
+		}
+
+		anime, err := client.GetAnimeByID(ctx, i)
+		if err != nil {
+			log.Printf("⚠️ Anime with ID %d not found (404) or error: %v", i, err)
+			failCount++
+			continue
+		}
+
+		animeList = append(animeList, *anime)
+		successCount++
+		log.Printf("Success got anime %d: %s", i, anime.Title)
 	}
 
-	data, err := json.MarshalIndent(anime, "", " ")
+	log.Printf("Result: success %d, not found %d", successCount, failCount)
+
+	if successCount == 0 {
+		log.Fatal("Can not get anyone anime")
+	}
+
+	data, err := json.MarshalIndent(animeList, "", " ")
 	if err != nil {
 		log.Fatalf("Error json encoding: %v", err)
 	}
