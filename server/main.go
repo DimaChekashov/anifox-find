@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -9,6 +10,8 @@ import (
 	"net/http"
 	"os"
 	"time"
+
+	"github.com/mattn/go-sqlite3"
 )
 
 type AnimeClient struct {
@@ -90,6 +93,30 @@ func (c *AnimeClient) GetAnimeByID(ctx context.Context, id int) (*Anime, error) 
 	}
 
 	return &result.Data, nil
+}
+
+func initDB() (*sql.DB, error) {
+	db, err := sql.Open("sqlite3", "anime.db")
+	if err != nil {
+		return nil, fmt.Errorf("Error opening DB: %w", err)
+	}
+
+	_, err = db.Exec(`
+	CREATE TABLE IF NOT EXISTS anime (
+		id INTEGER PRIMARY KEY,
+		title TEXT NOT NULL,
+		score REAL,
+		episodes INTEGER.
+		genres TEXT,
+		synopsis TEXT,
+		image_url TEXT,
+		updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+	)`)
+	if err != nil {
+		return nil, fmt.Errorf("Error creating table: %w", err)
+	}
+
+	return db, nil
 }
 
 func main() {
