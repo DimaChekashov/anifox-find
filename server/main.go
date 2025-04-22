@@ -119,6 +119,39 @@ func initDB() (*sql.DB, error) {
 	return db, nil
 }
 
+func saveAnime(db *sql.DB, anime Anime) error {
+	genresJSON, err := json.Marshal(anime.Genres)
+	if err != nil {
+		return fmt.Errorf("Error encoding genres: %w", err)
+	}
+
+	_, err = db.Exec(`
+	INSERT INTO anime (id, title, score, episodes, genres, synopsis, image_url, updated)
+	VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+	ON CONFLICT(id) DO UPDATE SET
+		title = excluded.title,
+		score = excluded.score,
+		episodes = excluded.episodes,
+		genres = excluded.genres,
+		synopsis = excluded.synopsis,
+		image_url = excluded.image_url,
+		updated = excluded.updated`,
+		anime.ID,
+		anime.Title,
+		anime.Score,
+		anime.Episodes,
+		string(genresJSON),
+		anime.Synopsis,
+		anime.Images,
+		time.Now(),
+	)
+	if err != nil {
+		return fmt.Errorf("Error saving into DB: %w", err)
+	}
+
+	return nil
+}
+
 func main() {
 	client := NewAnimeClient()
 
