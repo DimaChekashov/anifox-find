@@ -8,10 +8,9 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"os"
 	"time"
 
-	"github.com/mattn/go-sqlite3"
+	_ "github.com/mattn/go-sqlite3"
 )
 
 type AnimeClient struct {
@@ -98,7 +97,7 @@ func (c *AnimeClient) GetAnimeByID(ctx context.Context, id int) (*Anime, error) 
 func initDB() (*sql.DB, error) {
 	db, err := sql.Open("sqlite3", "anime.db")
 	if err != nil {
-		return nil, fmt.Errorf("Error opening DB: %w", err)
+		return nil, fmt.Errorf("error opening DB: %w", err)
 	}
 
 	_, err = db.Exec(`
@@ -107,7 +106,7 @@ func initDB() (*sql.DB, error) {
 		url TEXT,
 		title TEXT NOT NULL,
 		images TEXT,
-		episodes INTEGER.
+		episodes INTEGER,
 		score REAL,
 		aired TEXT,
 		genres TEXT,
@@ -115,7 +114,7 @@ func initDB() (*sql.DB, error) {
 		updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 	)`)
 	if err != nil {
-		return nil, fmt.Errorf("Error creating table: %w", err)
+		return nil, fmt.Errorf("error creating table: %w", err)
 	}
 
 	return db, nil
@@ -124,17 +123,17 @@ func initDB() (*sql.DB, error) {
 func saveAnime(db *sql.DB, anime Anime) error {
 	imagesJSON, err := json.Marshal(anime.Images)
 	if err != nil {
-		return fmt.Errorf("Error encoding images: %w", err)
+		return fmt.Errorf("error encoding images: %w", err)
 	}
 
 	airedJSON, err := json.Marshal(anime.Aired)
 	if err != nil {
-		return fmt.Errorf("Error encoding aired: %w", err)
+		return fmt.Errorf("error encoding aired: %w", err)
 	}
 
 	genresJSON, err := json.Marshal(anime.Genres)
 	if err != nil {
-		return fmt.Errorf("Error encoding genres: %w", err)
+		return fmt.Errorf("error encoding genres: %w", err)
 	}
 
 	_, err = db.Exec(`
@@ -162,19 +161,25 @@ func saveAnime(db *sql.DB, anime Anime) error {
 		time.Now(),
 	)
 	if err != nil {
-		return fmt.Errorf("Error saving into DB: %w", err)
+		return fmt.Errorf("error saving into DB: %w", err)
 	}
 
 	return nil
 }
 
 func main() {
+	db, err := initDB()
+	if err != nil {
+		log.Fatalf("Error init DB: %v", err)
+	}
+	defer db.Close()
+
 	client := NewAnimeClient()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	animeList := []Anime{}
+	// animeList := []Anime{}
 	var successCount, failCount int
 
 	for i := 1; i <= 20; i++ {
@@ -188,27 +193,67 @@ func main() {
 			failCount++
 			continue
 		}
+		if err := saveAnime(db, *anime); err != nil {
+			log.Printf("Error saving anime: %d: %v", anime.ID, err)
+		} else {
+			log.Printf("Success saving anime: %d: %v", anime.Title)
+		}
 
-		animeList = append(animeList, *anime)
+		// animeList = append(animeList, *anime)
 		successCount++
 		log.Printf("Success got anime %d: %s", i, anime.Title)
 	}
 
+	var storedAnime Anime
+	var imagesJSON string
+	var airedJSON string
+	var genresJSON string
+	err = db.QueryRow(`
+		SELECT id, url, title, images, episodes, score, aired, genres, synopsis
+		FROM anime WHERE id = ?`, 1).Scan(
+		&storedAnime.ID,
+		&storedAnime.URL,
+		&storedAnime.Title,
+		&imagesJSON,
+		&storedAnime.Episodes,
+		&storedAnime.Score,
+		&airedJSON,
+		&genresJSON,
+		&storedAnime.Synopsis,
+	)
+	if err != nil {
+		log.Fatalf("Error read from DB: %v", err)
+	}
+
+	if err := json.Unmarshal([]byte(imagesJSON), &storedAnime.Images); err != nil {
+		log.Printf("Error decoding images: %v", err)
+	}
+
+	if err := json.Unmarshal([]byte(airedJSON), &storedAnime.Aired); err != nil {
+		log.Printf("Error decoding aired: %v", err)
+	}
+
+	if err := json.Unmarshal([]byte(genresJSON), &storedAnime.Genres); err != nil {
+		log.Printf("Error decoding genres: %v", err)
+	}
+
+	fmt.Printf("Read from DB: %+v\n", storedAnime)
+
 	log.Printf("Result: success %d, not found %d", successCount, failCount)
 
-	if successCount == 0 {
-		log.Fatal("Can not get anyone anime")
-	}
+	// if successCount == 0 {
+	// 	log.Fatal("Can not get anyone anime")
+	// }
 
-	data, err := json.MarshalIndent(animeList, "", " ")
-	if err != nil {
-		log.Fatalf("Error json encoding: %v", err)
-	}
+	// data, err := json.MarshalIndent(animeList, "", " ")
+	// if err != nil {
+	// 	log.Fatalf("Error json encoding: %v", err)
+	// }
 
-	err = os.WriteFile("anime.json", data, 0644)
-	if err != nil {
-		log.Fatalf("Error writing to file: %v", err)
-	}
+	// err = os.WriteFile("anime.json", data, 0644)
+	// if err != nil {
+	// 	log.Fatalf("Error writing to file: %v", err)
+	// }
 
-	log.Println("The data successfully writen into anime.json")
+	// log.Println("The data successfully writen into anime.json")
 }
