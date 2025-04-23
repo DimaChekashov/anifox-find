@@ -104,12 +104,14 @@ func initDB() (*sql.DB, error) {
 	_, err = db.Exec(`
 	CREATE TABLE IF NOT EXISTS anime (
 		id INTEGER PRIMARY KEY,
+		url TEXT,
 		title TEXT NOT NULL,
-		score REAL,
+		images TEXT,
 		episodes INTEGER.
+		score REAL,
+		aired TEXT,
 		genres TEXT,
 		synopsis TEXT,
-		image_url TEXT,
 		updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 	)`)
 	if err != nil {
@@ -120,29 +122,43 @@ func initDB() (*sql.DB, error) {
 }
 
 func saveAnime(db *sql.DB, anime Anime) error {
+	imagesJSON, err := json.Marshal(anime.Images)
+	if err != nil {
+		return fmt.Errorf("Error encoding images: %w", err)
+	}
+
+	airedJSON, err := json.Marshal(anime.Aired)
+	if err != nil {
+		return fmt.Errorf("Error encoding aired: %w", err)
+	}
+
 	genresJSON, err := json.Marshal(anime.Genres)
 	if err != nil {
 		return fmt.Errorf("Error encoding genres: %w", err)
 	}
 
 	_, err = db.Exec(`
-	INSERT INTO anime (id, title, score, episodes, genres, synopsis, image_url, updated)
+	INSERT INTO anime (id, url, title, images, episodes, score, aired, genres, synopsis, updated)
 	VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 	ON CONFLICT(id) DO UPDATE SET
+		url = excluded.url,
 		title = excluded.title,
-		score = excluded.score,
+		images = excluded.images,
 		episodes = excluded.episodes,
+		score = excluded.score,
+		aired = excluded.aired,
 		genres = excluded.genres,
 		synopsis = excluded.synopsis,
-		image_url = excluded.image_url,
 		updated = excluded.updated`,
 		anime.ID,
+		anime.URL,
 		anime.Title,
-		anime.Score,
+		string(imagesJSON),
 		anime.Episodes,
+		anime.Score,
+		string(airedJSON),
 		string(genresJSON),
 		anime.Synopsis,
-		anime.Images,
 		time.Now(),
 	)
 	if err != nil {
