@@ -167,6 +167,39 @@ func saveAnime(db *sql.DB, anime Anime) error {
 	return nil
 }
 
+func printAllAnime(db *sql.DB) error {
+	rows, err := db.Query("SELECT * FROM anime")
+	if err != nil {
+		return fmt.Errorf("error query: %w", err)
+	}
+	defer rows.Close()
+
+	fmt.Println("----------------------------------")
+
+	for rows.Next() {
+		var (
+			id       int
+			url      string
+			title    string
+			images   string
+			episodes int
+			score    float64
+			aired    string
+			genres   string
+			synopsis string
+			updated  string
+		)
+
+		if err := rows.Scan(&id, &url, &title, &images, &episodes, &score, &aired, &genres, &synopsis, &updated); err != nil {
+			return fmt.Errorf("error reading rows: %w", err)
+		}
+
+		fmt.Printf("%d\t%s\t%.1f\t%d\n", id, title, score, episodes)
+	}
+
+	return rows.Err()
+}
+
 func main() {
 	db, err := initDB()
 	if err != nil {
@@ -196,7 +229,7 @@ func main() {
 		if err := saveAnime(db, *anime); err != nil {
 			log.Printf("Error saving anime: %d: %v", anime.ID, err)
 		} else {
-			log.Printf("Success saving anime: %d: %v", anime.Title)
+			log.Printf("Success saving anime: %s", anime.Title)
 		}
 
 		// animeList = append(animeList, *anime)
@@ -204,42 +237,46 @@ func main() {
 		log.Printf("Success got anime %d: %s", i, anime.Title)
 	}
 
-	var storedAnime Anime
-	var imagesJSON string
-	var airedJSON string
-	var genresJSON string
-	err = db.QueryRow(`
-		SELECT id, url, title, images, episodes, score, aired, genres, synopsis
-		FROM anime WHERE id = ?`, 1).Scan(
-		&storedAnime.ID,
-		&storedAnime.URL,
-		&storedAnime.Title,
-		&imagesJSON,
-		&storedAnime.Episodes,
-		&storedAnime.Score,
-		&airedJSON,
-		&genresJSON,
-		&storedAnime.Synopsis,
-	)
-	if err != nil {
-		log.Fatalf("Error read from DB: %v", err)
+	if err := printAllAnime(db); err != nil {
+		log.Fatalf("Error query table: %v", err)
 	}
 
-	if err := json.Unmarshal([]byte(imagesJSON), &storedAnime.Images); err != nil {
-		log.Printf("Error decoding images: %v", err)
-	}
+	// var storedAnime Anime
+	// var imagesJSON string
+	// var airedJSON string
+	// var genresJSON string
+	// err = db.QueryRow(`
+	// 	SELECT id, url, title, images, episodes, score, aired, genres, synopsis
+	// 	FROM anime WHERE id = ?`, 1).Scan(
+	// 	&storedAnime.ID,
+	// 	&storedAnime.URL,
+	// 	&storedAnime.Title,
+	// 	&imagesJSON,
+	// 	&storedAnime.Episodes,
+	// 	&storedAnime.Score,
+	// 	&airedJSON,
+	// 	&genresJSON,
+	// 	&storedAnime.Synopsis,
+	// )
+	// if err != nil {
+	// 	log.Fatalf("Error read from DB: %v", err)
+	// }
 
-	if err := json.Unmarshal([]byte(airedJSON), &storedAnime.Aired); err != nil {
-		log.Printf("Error decoding aired: %v", err)
-	}
+	// if err := json.Unmarshal([]byte(imagesJSON), &storedAnime.Images); err != nil {
+	// 	log.Printf("Error decoding images: %v", err)
+	// }
 
-	if err := json.Unmarshal([]byte(genresJSON), &storedAnime.Genres); err != nil {
-		log.Printf("Error decoding genres: %v", err)
-	}
+	// if err := json.Unmarshal([]byte(airedJSON), &storedAnime.Aired); err != nil {
+	// 	log.Printf("Error decoding aired: %v", err)
+	// }
 
-	fmt.Printf("Read from DB: %+v\n", storedAnime)
+	// if err := json.Unmarshal([]byte(genresJSON), &storedAnime.Genres); err != nil {
+	// 	log.Printf("Error decoding genres: %v", err)
+	// }
 
-	log.Printf("Result: success %d, not found %d", successCount, failCount)
+	// fmt.Printf("Read from DB: %+v\n", storedAnime)
+
+	// log.Printf("Result: success %d, not found %d", successCount, failCount)
 
 	// if successCount == 0 {
 	// 	log.Fatal("Can not get anyone anime")
