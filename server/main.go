@@ -42,8 +42,29 @@ type Aired struct {
 	To   time.Time `json:"to"`
 }
 
+type ImageFormats struct {
+	JPG struct {
+		ImageURL      string `json:"image_url"`
+		SmallImageURL string `json:"small_image_url"`
+		LargeImageURL string `json:"large_image_url"`
+	} `json:"jpg"`
+	WebP struct {
+		ImageURL      string `json:"image_url"`
+		SmallImageURL string `json:"small_image_url"`
+		LargeImageURL string `json:"large_image_url"`
+	} `json:"webp"`
+}
+
 type AnimeResponse struct {
-	Data Anime `json:"data"`
+	Data struct {
+		ID       int          `json:"mal_id"`
+		URL      string       `json:"url"`
+		Title    string       `json:"title"`
+		Images   ImageFormats `json:"images"`
+		Episodes int          `json:"episodes"`
+		Aired    Aired        `json:"aired"`
+		Synopsis string       `json:"synopsis"`
+	} `json:"data"`
 }
 
 func (c *AnimeClient) GetAnimeByID(ctx context.Context, id int) (*Anime, error) {
@@ -74,9 +95,17 @@ func (c *AnimeClient) GetAnimeByID(ctx context.Context, id int) (*Anime, error) 
 		return nil, fmt.Errorf("json unmarshal failed: %w", err)
 	}
 
-	fmt.Print(&result.Data)
+	anime := &Anime{
+		ID:       result.Data.ID,
+		URL:      result.Data.URL,
+		Title:    result.Data.Title,
+		Image:    result.Data.Images.JPG.LargeImageURL,
+		Episodes: result.Data.Episodes,
+		Aired:    result.Data.Aired,
+		Synopsis: result.Data.Synopsis,
+	}
 
-	return &result.Data, nil
+	return anime, nil
 }
 
 func initDB() (*sql.DB, error) {
@@ -247,57 +276,4 @@ func main() {
 	if err != nil {
 		log.Fatalf("Ошибка: %v", err)
 	}
-
-	// var storedAnime Anime
-	// var imagesJSON string
-	// var airedJSON string
-	// var genresJSON string
-	// err = db.QueryRow(`
-	// 	SELECT id, url, title, images, episodes, score, aired, genres, synopsis
-	// 	FROM anime WHERE id = ?`, 1).Scan(
-	// 	&storedAnime.ID,
-	// 	&storedAnime.URL,
-	// 	&storedAnime.Title,
-	// 	&imagesJSON,
-	// 	&storedAnime.Episodes,
-	// 	&storedAnime.Score,
-	// 	&airedJSON,
-	// 	&genresJSON,
-	// 	&storedAnime.Synopsis,
-	// )
-	// if err != nil {
-	// 	log.Fatalf("Error read from DB: %v", err)
-	// }
-
-	// if err := json.Unmarshal([]byte(imagesJSON), &storedAnime.Images); err != nil {
-	// 	log.Printf("Error decoding images: %v", err)
-	// }
-
-	// if err := json.Unmarshal([]byte(airedJSON), &storedAnime.Aired); err != nil {
-	// 	log.Printf("Error decoding aired: %v", err)
-	// }
-
-	// if err := json.Unmarshal([]byte(genresJSON), &storedAnime.Genres); err != nil {
-	// 	log.Printf("Error decoding genres: %v", err)
-	// }
-
-	// fmt.Printf("Read from DB: %+v\n", storedAnime)
-
-	// log.Printf("Result: success %d, not found %d", successCount, failCount)
-
-	// if successCount == 0 {
-	// 	log.Fatal("Can not get anyone anime")
-	// }
-
-	// data, err := json.MarshalIndent(animeList, "", " ")
-	// if err != nil {
-	// 	log.Fatalf("Error json encoding: %v", err)
-	// }
-
-	// err = os.WriteFile("anime.json", data, 0644)
-	// if err != nil {
-	// 	log.Fatalf("Error writing to file: %v", err)
-	// }
-
-	// log.Println("The data successfully writen into anime.json")
 }
