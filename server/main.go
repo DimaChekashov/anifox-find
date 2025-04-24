@@ -28,35 +28,18 @@ func NewAnimeClient() *AnimeClient {
 }
 
 type Anime struct {
-	ID       int     `json:"mal_id"`
-	URL      string  `json:"url"`
-	Title    string  `json:"title"`
-	Images   Images  `json:"images"`
-	Episodes int     `json:"episodes"`
-	Score    float64 `json:"score"`
-	Aired    Aired   `json:"aired"`
-	Genres   []Genre `json:"genres"`
-	Synopsis string  `json:"synopsis"`
-}
-
-type Images struct {
-	JPG ImageURLs `json:"jpg"`
-}
-
-type ImageURLs struct {
-	ImageURL      string `json:"image_url"`
-	SmallImageURL string `json:"small_image_url"`
-	LargeImageURL string `json:"large_image_url"`
+	ID       int    `json:"mal_id"`
+	URL      string `json:"url"`
+	Title    string `json:"title"`
+	Image    string `json:"image"`
+	Episodes int    `json:"episodes"`
+	Aired    Aired  `json:"aired"`
+	Synopsis string `json:"synopsis"`
 }
 
 type Aired struct {
 	From time.Time `json:"from"`
 	To   time.Time `json:"to"`
-}
-
-type Genre struct {
-	ID   int    `json:"mal_id"`
-	Name string `json:"name"`
 }
 
 type AnimeResponse struct {
@@ -91,6 +74,8 @@ func (c *AnimeClient) GetAnimeByID(ctx context.Context, id int) (*Anime, error) 
 		return nil, fmt.Errorf("json unmarshal failed: %w", err)
 	}
 
+	fmt.Print(&result.Data)
+
 	return &result.Data, nil
 }
 
@@ -105,11 +90,9 @@ func initDB() (*sql.DB, error) {
 		id INTEGER PRIMARY KEY,
 		url TEXT,
 		title TEXT NOT NULL,
-		images TEXT,
+		image TEXT,
 		episodes INTEGER,
-		score REAL,
 		aired TEXT,
-		genres TEXT,
 		synopsis TEXT,
 		updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 	)`)
@@ -121,83 +104,106 @@ func initDB() (*sql.DB, error) {
 }
 
 func saveAnime(db *sql.DB, anime Anime) error {
-	imagesJSON, err := json.Marshal(anime.Images)
-	if err != nil {
-		return fmt.Errorf("error encoding images: %w", err)
-	}
-
 	airedJSON, err := json.Marshal(anime.Aired)
 	if err != nil {
-		return fmt.Errorf("error encoding aired: %w", err)
+		return fmt.Errorf("failed to marshal aired data: %w", err)
 	}
 
-	genresJSON, err := json.Marshal(anime.Genres)
-	if err != nil {
-		return fmt.Errorf("error encoding genres: %w", err)
-	}
-
-	_, err = db.Exec(`
-	INSERT INTO anime (id, url, title, images, episodes, score, aired, genres, synopsis, updated)
-	VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+	query := `
+	INSERT INTO anime (
+		id,
+		url,
+		title,
+		image,
+		episodes,
+		aired,
+		synopsis,
+		updated
+	) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 	ON CONFLICT(id) DO UPDATE SET
 		url = excluded.url,
 		title = excluded.title,
-		images = excluded.images,
+		image = excluded.image,
 		episodes = excluded.episodes,
-		score = excluded.score,
 		aired = excluded.aired,
-		genres = excluded.genres,
 		synopsis = excluded.synopsis,
-		updated = excluded.updated`,
+		updated = excluded.updated`
+
+	_, err = db.Exec(query,
 		anime.ID,
 		anime.URL,
 		anime.Title,
-		string(imagesJSON),
+		anime.Image,
 		anime.Episodes,
-		anime.Score,
-		string(airedJSON),
-		string(genresJSON),
+		airedJSON,
 		anime.Synopsis,
-		time.Now(),
+		time.Now().UTC(),
 	)
 	if err != nil {
-		return fmt.Errorf("error saving into DB: %w", err)
+		return fmt.Errorf("failed to save anime (ID: %d): %w", anime.ID, err)
 	}
 
 	return nil
 }
 
-func printAllAnime(db *sql.DB) error {
+func exportAnimeToJSON(db *sql.DB) error {
 	rows, err := db.Query("SELECT * FROM anime")
 	if err != nil {
-		return fmt.Errorf("error query: %w", err)
+		return fmt.Errorf("error query: %v", err)
 	}
 	defer rows.Close()
 
-	fmt.Println("----------------------------------")
-
-	for rows.Next() {
-		var (
-			id       int
-			url      string
-			title    string
-			images   string
-			episodes int
-			score    float64
-			aired    string
-			genres   string
-			synopsis string
-			updated  string
-		)
-
-		if err := rows.Scan(&id, &url, &title, &images, &episodes, &score, &aired, &genres, &synopsis, &updated); err != nil {
-			return fmt.Errorf("error reading rows: %w", err)
-		}
-
-		fmt.Printf("%d\t%s\t%.1f\t%d\n", id, title, score, episodes)
+	columns, err := rows.Columns()
+	if err != nil {
+		return fmt.Errorf("error get column: %v", err)
 	}
 
-	return rows.Err()
+	var results []map[string]interface{}
+
+	for rows.Next() {
+		values := make([]interface{}, len(columns))
+		pointers := make([]interface{}, len(columns))
+		for i := range values {
+			pointers[i] = &values[i]
+		}
+
+		if err := rows.Scan(pointers...); err != nil {
+			return fmt.Errorf("error scan rows: %v", err)
+		}
+
+		rowData := make(map[string]interface{})
+		for i, colName := range columns {
+			val := values[i]
+
+			switch v := val.(type) {
+			case []byte:
+				var jsonData interface{}
+				if err := json.Unmarshal(v, &jsonData); err == nil {
+					rowData[colName] = jsonData
+				} else {
+					rowData[colName] = string(v)
+				}
+			case nil:
+				rowData[colName] = nil
+			default:
+				rowData[colName] = v
+			}
+		}
+
+		results = append(results, rowData)
+	}
+
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("error iteration rows: %v", err)
+	}
+
+	jsonData, err := json.MarshalIndent(results, "", "  ")
+	if err != nil {
+		return fmt.Errorf("error encoding JSON: %v", err)
+	}
+
+	fmt.Println(string(jsonData))
+	return nil
 }
 
 func main() {
@@ -237,8 +243,9 @@ func main() {
 		log.Printf("Success got anime %d: %s", i, anime.Title)
 	}
 
-	if err := printAllAnime(db); err != nil {
-		log.Fatalf("Error query table: %v", err)
+	err = exportAnimeToJSON(db)
+	if err != nil {
+		log.Fatalf("Ошибка: %v", err)
 	}
 
 	// var storedAnime Anime
