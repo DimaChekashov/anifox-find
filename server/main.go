@@ -175,16 +175,16 @@ func saveAnime(db *sql.DB, anime Anime) error {
 	return nil
 }
 
-func exportAnimeToJSON(db *sql.DB) error {
+func exportAnimeToJSON(db *sql.DB) ([]byte, error) {
 	rows, err := db.Query("SELECT * FROM anime")
 	if err != nil {
-		return fmt.Errorf("error query: %v", err)
+		return nil, fmt.Errorf("error query: %v", err)
 	}
 	defer rows.Close()
 
 	columns, err := rows.Columns()
 	if err != nil {
-		return fmt.Errorf("error get column: %v", err)
+		return nil, fmt.Errorf("error get column: %v", err)
 	}
 
 	var results []map[string]interface{}
@@ -197,7 +197,7 @@ func exportAnimeToJSON(db *sql.DB) error {
 		}
 
 		if err := rows.Scan(pointers...); err != nil {
-			return fmt.Errorf("error scan rows: %v", err)
+			return nil, fmt.Errorf("error scan rows: %v", err)
 		}
 
 		rowData := make(map[string]interface{})
@@ -223,16 +223,10 @@ func exportAnimeToJSON(db *sql.DB) error {
 	}
 
 	if err := rows.Err(); err != nil {
-		return fmt.Errorf("error iteration rows: %v", err)
+		return nil, fmt.Errorf("error iteration rows: %v", err)
 	}
 
-	jsonData, err := json.MarshalIndent(results, "", "  ")
-	if err != nil {
-		return fmt.Errorf("error encoding JSON: %v", err)
-	}
-
-	fmt.Println(string(jsonData))
-	return nil
+	return json.MarshalIndent(results, "", "  ")
 }
 
 func parseAnimeAndSaveToDB(db *sql.DB, size int) error {
@@ -274,10 +268,33 @@ func main() {
 	}
 	defer db.Close()
 
-	// parseAnimeAndSaveToDB(db, 60)
+	http.HandleFunc("/anime", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
 
-	err = exportAnimeToJSON(db)
-	if err != nil {
-		log.Fatalf("Ошибка: %v", err)
+		jsonData, err := exportAnimeToJSON(db)
+		if err != nil {
+			log.Printf("Error generating JSON: %v", err)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.WriteHeader(http.StatusOK)
+		w.Write(jsonData)
+	})
+
+	server := http.Server{
+		Addr:         ":8080",
+		ReadTimeout:  10 * time.Second,
+		WriteTimeout: 10 * time.Second,
 	}
+
+	log.Printf("Server start on http://localhost%s", server.Addr)
+	log.Fatal(server.ListenAndServe())
+
+	// parseAnimeAndSaveToDB(db, 60)
 }
