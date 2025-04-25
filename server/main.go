@@ -235,22 +235,15 @@ func exportAnimeToJSON(db *sql.DB) error {
 	return nil
 }
 
-func main() {
-	db, err := initDB()
-	if err != nil {
-		log.Fatalf("Error init DB: %v", err)
-	}
-	defer db.Close()
-
+func parseAnimeAndSaveToDB(db *sql.DB, size int) error {
 	client := NewAnimeClient()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	// animeList := []Anime{}
 	var successCount, failCount int
 
-	for i := 1; i <= 20; i++ {
+	for i := 1; i <= size; i++ {
 		if i > 1 {
 			time.Sleep(350 * time.Millisecond)
 		}
@@ -267,10 +260,21 @@ func main() {
 			log.Printf("Success saving anime: %s", anime.Title)
 		}
 
-		// animeList = append(animeList, *anime)
 		successCount++
 		log.Printf("Success got anime %d: %s", i, anime.Title)
 	}
+
+	return nil
+}
+
+func main() {
+	db, err := initDB()
+	if err != nil {
+		log.Fatalf("Error init DB: %v", err)
+	}
+	defer db.Close()
+
+	// parseAnimeAndSaveToDB(db, 60)
 
 	err = exportAnimeToJSON(db)
 	if err != nil {
