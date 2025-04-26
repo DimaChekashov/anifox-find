@@ -229,6 +229,60 @@ func exportAnimeToJSON(db *sql.DB) ([]byte, error) {
 	return json.MarshalIndent(results, "", "  ")
 }
 
+func exportOneAnimeToJSONByID(db *sql.DB, id int) ([]byte, error) {
+	row := db.QueryRow(`
+		SELECT
+			id,
+			title,
+			score,
+			episodes,
+			images,
+			genres,
+			synopsis,
+			updated
+		FROM anime
+		WHERE ID = ?
+	`, id)
+	
+	columns := []string{"id", "title", "score", "episodes", "images", "genres", "synopsis", "updated"}
+
+	values := make([]interface{}, len(columns))
+    pointers := make([]interface{}, len(columns))
+    for i := range values {
+        pointers[i] = &values[i]
+    }
+
+    if err := row.Scan(pointers...); err != nil {
+        if err == sql.ErrNoRows {
+            return nil, fmt.Errorf("anime with ID %d not found", id)
+        }
+        return nil, fmt.Errorf("database scan error: %w", err)
+    }
+
+    result := make(map[string]interface{})
+    for i, colName := range columns {
+        val := values[i]
+        
+        switch v := val.(type) {
+        case []byte:
+            if colName == "images" || colName == "genres" {
+                var jsonData interface{}
+                if err := json.Unmarshal(v, &jsonData); err == nil {
+                    result[colName] = jsonData
+                    continue
+                }
+            }
+            result[colName] = string(v)
+        case nil:
+            result[colName] = nil
+        default:
+            result[colName] = v
+        }
+    }
+
+    return json.MarshalIndent(result, "", "  ")
+}
+
 func parseAnimeAndSaveToDB(db *sql.DB, size int) error {
 	client := NewAnimeClient()
 
