@@ -8,6 +8,8 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"strconv"
+	"strings"
 	"time"
 
 	_ "github.com/mattn/go-sqlite3"
@@ -243,44 +245,44 @@ func exportOneAnimeToJSONByID(db *sql.DB, id int) ([]byte, error) {
 		FROM anime
 		WHERE ID = ?
 	`, id)
-	
+
 	columns := []string{"id", "title", "score", "episodes", "images", "genres", "synopsis", "updated"}
 
 	values := make([]interface{}, len(columns))
-    pointers := make([]interface{}, len(columns))
-    for i := range values {
-        pointers[i] = &values[i]
-    }
+	pointers := make([]interface{}, len(columns))
+	for i := range values {
+		pointers[i] = &values[i]
+	}
 
-    if err := row.Scan(pointers...); err != nil {
-        if err == sql.ErrNoRows {
-            return nil, fmt.Errorf("anime with ID %d not found", id)
-        }
-        return nil, fmt.Errorf("database scan error: %w", err)
-    }
+	if err := row.Scan(pointers...); err != nil {
+		if err == sql.ErrNoRows {
+			return nil, fmt.Errorf("anime with ID %d not found", id)
+		}
+		return nil, fmt.Errorf("database scan error: %w", err)
+	}
 
-    result := make(map[string]interface{})
-    for i, colName := range columns {
-        val := values[i]
-        
-        switch v := val.(type) {
-        case []byte:
-            if colName == "images" || colName == "genres" {
-                var jsonData interface{}
-                if err := json.Unmarshal(v, &jsonData); err == nil {
-                    result[colName] = jsonData
-                    continue
-                }
-            }
-            result[colName] = string(v)
-        case nil:
-            result[colName] = nil
-        default:
-            result[colName] = v
-        }
-    }
+	result := make(map[string]interface{})
+	for i, colName := range columns {
+		val := values[i]
 
-    return json.MarshalIndent(result, "", "  ")
+		switch v := val.(type) {
+		case []byte:
+			if colName == "images" || colName == "genres" {
+				var jsonData interface{}
+				if err := json.Unmarshal(v, &jsonData); err == nil {
+					result[colName] = jsonData
+					continue
+				}
+			}
+			result[colName] = string(v)
+		case nil:
+			result[colName] = nil
+		default:
+			result[colName] = v
+		}
+	}
+
+	return json.MarshalIndent(result, "", "  ")
 }
 
 func parseAnimeAndSaveToDB(db *sql.DB, size int) error {
@@ -322,7 +324,7 @@ func main() {
 	}
 	defer db.Close()
 
-	http.HandleFunc("/anime", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/anime-list/", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 			return
@@ -338,6 +340,34 @@ func main() {
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.WriteHeader(http.StatusOK)
+		w.Write(jsonData)
+	})
+
+	http.HandleFunc("/anime/", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		idStr := strings.TrimPrefix(r.URL.Path, "/anime/")
+		id, err := strconv.Atoi(idStr)
+		if err != nil {
+			http.Error(w, "Invalid anime ID", http.StatusBadRequest)
+			return
+		}
+
+		jsonData, err := exportOneAnimeToJSONByID(db, id)
+		if err != nil {
+			if strings.Contains(err.Error(), "not found") {
+				http.Error(w, err.Error(), http.StatusNotFound)
+			} else {
+				log.Printf("Error: %v", err)
+				http.Error(w, "Internal server error", http.StatusInternalServerError)
+			}
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
 		w.Write(jsonData)
 	})
 
