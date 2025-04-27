@@ -118,7 +118,7 @@ func initDB() (*sql.DB, error) {
 
 	_, err = db.Exec(`
 	CREATE TABLE IF NOT EXISTS anime (
-		id INTEGER PRIMARY KEY,
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		url TEXT,
 		title TEXT NOT NULL,
 		image TEXT,
@@ -142,7 +142,6 @@ func saveAnime(db *sql.DB, anime Anime) error {
 
 	query := `
 	INSERT INTO anime (
-		id,
 		url,
 		title,
 		image,
@@ -150,7 +149,7 @@ func saveAnime(db *sql.DB, anime Anime) error {
 		aired,
 		synopsis,
 		updated
-	) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+	) VALUES (?, ?, ?, ?, ?, ?, ?)
 	ON CONFLICT(id) DO UPDATE SET
 		url = excluded.url,
 		title = excluded.title,
@@ -161,7 +160,6 @@ func saveAnime(db *sql.DB, anime Anime) error {
 		updated = excluded.updated`
 
 	_, err = db.Exec(query,
-		anime.ID,
 		anime.URL,
 		anime.Title,
 		anime.Image,
