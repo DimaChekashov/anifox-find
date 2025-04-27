@@ -246,7 +246,7 @@ func exportOneAnimeToJSONByID(db *sql.DB, id int) ([]byte, error) {
 		WHERE ID = ?
 	`, id)
 
-	columns := []string{"id", "url", "title", "image" , "episodes", "aired", "synopsis", "updated"}
+	columns := []string{"id", "url", "title", "image", "episodes", "aired", "synopsis", "updated"}
 
 	values := make([]interface{}, len(columns))
 	pointers := make([]interface{}, len(columns))
@@ -317,14 +317,9 @@ func parseAnimeAndSaveToDB(db *sql.DB, size int) error {
 	return nil
 }
 
-func main() {
-	db, err := initDB()
-	if err != nil {
-		log.Fatalf("Error init DB: %v", err)
-	}
-	defer db.Close()
-
-	http.HandleFunc("/anime-list/", func(w http.ResponseWriter, r *http.Request) {
+// Handlers
+func handleAnimeList(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 			return
@@ -341,9 +336,10 @@ func main() {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.WriteHeader(http.StatusOK)
 		w.Write(jsonData)
-	})
-
-	http.HandleFunc("/anime/", func(w http.ResponseWriter, r *http.Request) {
+	}
+}
+func handleSingleAnime(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 			return
@@ -369,7 +365,18 @@ func main() {
 
 		w.Header().Set("Content-Type", "application/json")
 		w.Write(jsonData)
-	})
+	}
+}
+
+func main() {
+	db, err := initDB()
+	if err != nil {
+		log.Fatalf("Error init DB: %v", err)
+	}
+	defer db.Close()
+
+	http.HandleFunc("/anime", handleAnimeList(db))
+	http.HandleFunc("/anime/", handleSingleAnime(db))
 
 	server := http.Server{
 		Addr:         ":8080",
