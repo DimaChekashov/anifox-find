@@ -235,18 +235,18 @@ func exportOneAnimeToJSONByID(db *sql.DB, id int) ([]byte, error) {
 	row := db.QueryRow(`
 		SELECT
 			id,
+			url,
 			title,
-			score,
+			image,
 			episodes,
-			images,
-			genres,
+			aired,
 			synopsis,
 			updated
 		FROM anime
 		WHERE ID = ?
 	`, id)
 
-	columns := []string{"id", "title", "score", "episodes", "images", "genres", "synopsis", "updated"}
+	columns := []string{"id", "url", "title", "image" , "episodes", "aired", "synopsis", "updated"}
 
 	values := make([]interface{}, len(columns))
 	pointers := make([]interface{}, len(columns))
