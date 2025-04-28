@@ -12,6 +12,8 @@ import (
 	"time"
 
 	_ "github.com/mattn/go-sqlite3"
+
+	// "github.com/DimaChekashov/anifox-find/internal/parser"
 )
 
 type Anime struct {
@@ -388,5 +390,5 @@ func main() {
 	log.Printf("Server start on http://localhost%s", server.Addr)
 	log.Fatal(server.ListenAndServe())
 
-	// parseAnimeAndSaveToDB(db, 60)
+	// parser.ParseAnimeAndSaveToDB(db, 60)
 }
