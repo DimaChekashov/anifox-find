@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math"
 	"net/http"
 	"strconv"
 	"strings"
@@ -315,6 +316,63 @@ func parseAnimeAndSaveToDB(db *sql.DB, size int) error {
 	return nil
 }
 
+func getAnimePaginated(db *sql.DB, offset, limit int) ([]Anime, error) {
+	rows, err := db.Query("SELECT * FROM anime ORDER BY id LIMIT ? OFFSET ?", limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var animeList []Anime
+	var updated time.Time
+
+	for rows.Next() {
+		var a Anime
+		var airedJSON []byte
+		var image sql.NullString
+
+		err := rows.Scan(
+			&a.ID,
+			&a.URL,
+			&a.Title,
+			&image,
+			&a.Episodes,
+			&airedJSON,
+			&a.Synopsis,
+			&updated,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("row scan error: %w", err)
+		}
+
+		if image.Valid {
+			a.Image = image.String
+		} else {
+			a.Image = ""
+		}
+
+		if len(airedJSON) > 0 {
+			if err := json.Unmarshal(airedJSON, &a.Aired); err != nil {
+				return nil, fmt.Errorf("failed to parse aired JSON: %w", err)
+			}
+		}
+
+		animeList = append(animeList, a)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("rows iteration error: %w", err)
+	}
+
+	return animeList, nil
+}
+
+func getTotalAnimeCount(db *sql.DB) (int, error) {
+	var count int
+	err := db.QueryRow("SELECT COUNT(*) FROM anime").Scan(&count)
+	return count, err
+}
+
 // Handlers
 func handleAnimeList(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -323,9 +381,48 @@ func handleAnimeList(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		jsonData, err := exportAnimeToJSON(db)
+		page := 1
+		limit := 20
+
+		if p := r.URL.Query().Get("page"); p != "" {
+			if pNum, err := strconv.Atoi(p); err == nil && pNum > 0 {
+				page = pNum
+			}
+		}
+
+		if l := r.URL.Query().Get("limit"); l != "" {
+			if lNum, err := strconv.Atoi(l); err == nil && lNum > 0 && lNum <= 100 {
+				limit = lNum
+			}
+		}
+
+		offset := (page - 1) * limit
+
+		animeList, err := getAnimePaginated(db, offset, limit)
 		if err != nil {
-			log.Printf("Error generating JSON: %v", err)
+			log.Printf("Database error: %v", err)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
+
+		total, err := getTotalAnimeCount(db)
+		if err != nil {
+			log.Printf("Count error: %v", err)
+		}
+
+		response := map[string]interface{}{
+			"data": animeList,
+			"meta": map[string]interface{}{
+				"page":       page,
+				"limit":      limit,
+				"total":      total,
+				"totalPages": int(math.Ceil(float64(total) / float64(limit))),
+			},
+		}
+
+		jsonData, err := json.Marshal(response)
+		if err != nil {
+			log.Printf("JSON error: %v", err)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
