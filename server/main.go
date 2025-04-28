@@ -373,6 +373,39 @@ func getTotalAnimeCount(db *sql.DB) (int, error) {
 	return count, err
 }
 
+func searchAnimeByTitle(db *sql.DB, title string) ([]Anime, error) {
+	query := `SELECT * FROM anime WHERE title LIKE ?`
+
+	rows, err := db.Query(query, "%"+title+"%")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var animeList []Anime
+	var updated time.Time
+	for rows.Next() {
+		var a Anime
+		var airedJSON []byte
+		var image sql.NullString
+		if err := rows.Scan(
+			&a.ID,
+			&a.URL,
+			&a.Title,
+			&image,
+			&a.Episodes,
+			&airedJSON,
+			&a.Synopsis,
+			&updated,
+		); err != nil {
+			return nil, err
+		}
+		animeList = append(animeList, a)
+	}
+
+	return animeList, nil
+}
+
 // Handlers
 func handleAnimeList(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -433,6 +466,7 @@ func handleAnimeList(db *sql.DB) http.HandlerFunc {
 		w.Write(jsonData)
 	}
 }
+
 func handleSingleAnime(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
@@ -459,7 +493,33 @@ func handleSingleAnime(db *sql.DB) http.HandlerFunc {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
 		w.Write(jsonData)
+	}
+}
+
+func handleSearchAnime(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		titleQuery := strings.TrimSpace(r.URL.Query().Get("title"))
+		if titleQuery == "" {
+			http.Error(w, "Title query parameter is required", http.StatusBadRequest)
+			return
+		}
+
+		results, err := searchAnimeByTitle(db, titleQuery)
+		if err != nil {
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(results)
 	}
 }
 
@@ -472,6 +532,7 @@ func main() {
 
 	http.HandleFunc("/anime", handleAnimeList(db))
 	http.HandleFunc("/anime/", handleSingleAnime(db))
+	http.HandleFunc("/anime/search", handleSearchAnime(db))
 
 	server := http.Server{
 		Addr:         ":8080",
