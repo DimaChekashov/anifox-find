@@ -1,8 +1,10 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"math"
@@ -15,6 +17,7 @@ import (
 	// "github.com/DimaChekashov/anifox-find/internal/parser"
 )
 
+// Anime entity
 type Anime struct {
 	ID       int    `json:"mal_id"`
 	URL      string `json:"url"`
@@ -30,6 +33,7 @@ type Aired struct {
 	To   time.Time `json:"to"`
 }
 
+// User entity
 type User struct {
 	ID        int       `json:"id" db:"id"`
 	Username  string    `json:"username" db:"username"`
@@ -46,6 +50,52 @@ type AuthRequest struct {
 	Email    string `json:"email" validate:"email,omitempty"`
 }
 
+// User repository
+var ErrUserNotFound = errors.New("user not found")
+
+type Repository struct {
+	db *sql.DB
+}
+
+func NewRepository(db *sql.DB) *Repository {
+	return &Repository{db: db}
+}
+
+func (r *Repository) CreateUser(ctx context.Context, u *User) error {
+	query := `
+		INSERT INTO users (username, email, password, role)
+		VALUES ($1, $2, $3, $4)
+		RETURNING id, created_at, updated_at
+	`
+
+	return r.db.QueryRowContext(
+		ctx,
+		query,
+		u.Username,
+		u.Email,
+		u.Password,
+		"user",
+	).Scan(&u.ID, &u.CreatedAt, &u.UpdatedAt)
+}
+
+func (r *Repository) GetUserByUsername(ctx context.Context, username string) (*User, error) {
+	u := &User{}
+	query := `SELECT id, username, email, password, role FROM users WHERE username = $1`
+	err := r.db.QueryRowContext(ctx, query, username).Scan(
+		&u.ID,
+		&u.Username,
+		&u.Email,
+		&u.Password,
+		&u.Role,
+	)
+	if err == sql.ErrNoRows {
+		return nil, ErrUserNotFound
+	}
+
+	return u, err
+}
+
+// DB
 func initDB() (*sql.DB, error) {
 	db, err := sql.Open("sqlite3", "anime.db")
 	if err != nil {
