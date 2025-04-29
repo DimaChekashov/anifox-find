@@ -12,7 +12,6 @@ import (
 	"time"
 
 	_ "github.com/mattn/go-sqlite3"
-
 	// "github.com/DimaChekashov/anifox-find/internal/parser"
 )
 
@@ -29,6 +28,16 @@ type Anime struct {
 type Aired struct {
 	From time.Time `json:"from"`
 	To   time.Time `json:"to"`
+}
+
+type User struct {
+	ID        int       `json:"id" db:"id"`
+	Username  string    `json:"username" db:"username"`
+	Email     string    `json:"email" db:"email"`
+	Password  string    `json:"-" db:"password"`
+	Role      string    `json:"role" db:"role"`
+	CreatedAt time.Time `json:"created_at" db:"created_at"`
+	UpdatedAt time.Time `json:"updated_at" db:"updated_at"`
 }
 
 func initDB() (*sql.DB, error) {
