@@ -40,6 +40,12 @@ type User struct {
 	UpdatedAt time.Time `json:"updated_at" db:"updated_at"`
 }
 
+type AuthRequest struct {
+	Username string `json:"username" validate:"required,min=3"`
+	Password string `json:"password" validate:"required,min=8"`
+	Email    string `json:"email" validate:"email,omitempty"`
+}
+
 func initDB() (*sql.DB, error) {
 	db, err := sql.Open("sqlite3", "anime.db")
 	if err != nil {
