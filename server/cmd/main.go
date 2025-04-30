@@ -512,6 +512,12 @@ func main() {
 	http.HandleFunc("/anime/", handleSingleAnime(db))
 	http.HandleFunc("/anime/search", handleSearchAnime(db))
 
+	userRepo := NewRepository(db)
+	userSvc := NewService(userRepo)
+	userHandler := NewHandler(userSvc)
+
+	http.HandleFunc("/register", userHandler.Register)
+
 	server := http.Server{
 		Addr:         ":8080",
 		ReadTimeout:  10 * time.Second,
