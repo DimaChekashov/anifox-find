@@ -9,22 +9,9 @@ import (
 	"log"
 	"net/http"
 	"time"
+
+	"github.com/DimaChekashov/anifox-find/internal/models"
 )
-
-type Anime struct {
-	ID       int    `json:"mal_id"`
-	URL      string `json:"url"`
-	Title    string `json:"title"`
-	Image    string `json:"image"`
-	Episodes int    `json:"episodes"`
-	Aired    Aired  `json:"aired"`
-	Synopsis string `json:"synopsis"`
-}
-
-type Aired struct {
-	From time.Time `json:"from"`
-	To   time.Time `json:"to"`
-}
 
 type AnimeClient struct {
 	baseURL    string
@@ -60,12 +47,12 @@ type AnimeResponse struct {
 		Title    string       `json:"title"`
 		Images   ImageFormats `json:"images"`
 		Episodes int          `json:"episodes"`
-		Aired    Aired        `json:"aired"`
+		Aired    models.Aired `json:"aired"`
 		Synopsis string       `json:"synopsis"`
 	} `json:"data"`
 }
 
-func (c *AnimeClient) getAnimeByID(ctx context.Context, id int) (*Anime, error) {
+func (c *AnimeClient) getAnimeByID(ctx context.Context, id int) (*models.Anime, error) {
 	url := fmt.Sprintf("%s/anime/%d", c.baseURL, id)
 
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
@@ -93,7 +80,7 @@ func (c *AnimeClient) getAnimeByID(ctx context.Context, id int) (*Anime, error) 
 		return nil, fmt.Errorf("json unmarshal failed: %w", err)
 	}
 
-	anime := &Anime{
+	anime := &models.Anime{
 		ID:       result.Data.ID,
 		URL:      result.Data.URL,
 		Title:    result.Data.Title,
@@ -106,7 +93,7 @@ func (c *AnimeClient) getAnimeByID(ctx context.Context, id int) (*Anime, error) 
 	return anime, nil
 }
 
-func saveAnime(db *sql.DB, anime Anime) error {
+func saveAnime(db *sql.DB, anime models.Anime) error {
 	airedJSON, err := json.Marshal(anime.Aired)
 	if err != nil {
 		return fmt.Errorf("failed to marshal aired data: %w", err)

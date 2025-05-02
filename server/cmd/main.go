@@ -13,43 +13,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/DimaChekashov/anifox-find/internal/models"
 	_ "github.com/mattn/go-sqlite3"
 	"golang.org/x/crypto/bcrypt"
 	// "github.com/DimaChekashov/anifox-find/internal/parser"
 )
-
-// Anime entity
-type Anime struct {
-	ID       int    `json:"mal_id"`
-	URL      string `json:"url"`
-	Title    string `json:"title"`
-	Image    string `json:"image"`
-	Episodes int    `json:"episodes"`
-	Aired    Aired  `json:"aired"`
-	Synopsis string `json:"synopsis"`
-}
-
-type Aired struct {
-	From time.Time `json:"from"`
-	To   time.Time `json:"to"`
-}
-
-// User entity
-type User struct {
-	ID        int       `json:"id" db:"id"`
-	Username  string    `json:"username" db:"username"`
-	Email     string    `json:"email" db:"email"`
-	Password  string    `json:"-" db:"password"`
-	Role      string    `json:"role" db:"role"`
-	CreatedAt time.Time `json:"created_at" db:"created_at"`
-	UpdatedAt time.Time `json:"updated_at" db:"updated_at"`
-}
-
-type AuthRequest struct {
-	Username string `json:"username" validate:"required,min=3"`
-	Password string `json:"password" validate:"required,min=8"`
-	Email    string `json:"email" validate:"email,omitempty"`
-}
 
 // User repository
 var ErrUserNotFound = errors.New("user not found")
@@ -62,7 +30,7 @@ func NewRepository(db *sql.DB) *Repository {
 	return &Repository{db: db}
 }
 
-func (r *Repository) CreateUser(ctx context.Context, u *User) error {
+func (r *Repository) CreateUser(ctx context.Context, u *models.User) error {
 	query := `
 		INSERT INTO users (username, email, password, role)
 		VALUES ($1, $2, $3, $4)
@@ -79,8 +47,8 @@ func (r *Repository) CreateUser(ctx context.Context, u *User) error {
 	).Scan(&u.ID, &u.CreatedAt, &u.UpdatedAt)
 }
 
-func (r *Repository) GetUserByUsername(ctx context.Context, username string) (*User, error) {
-	u := &User{}
+func (r *Repository) GetUserByUsername(ctx context.Context, username string) (*models.User, error) {
+	u := &models.User{}
 	query := `SELECT id, username, email, password, role FROM users WHERE username = $1`
 	err := r.db.QueryRowContext(ctx, query, username).Scan(
 		&u.ID,
@@ -104,13 +72,13 @@ func NewService(repo *Repository) *Service {
 	return &Service{repo: repo}
 }
 
-func (s *Service) RegisterUser(ctx context.Context, req *AuthRequest) (*User, error) {
+func (s *Service) RegisterUser(ctx context.Context, req *models.AuthRequest) (*models.User, error) {
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
 		return nil, err
 	}
 
-	user := &User{
+	user := &models.User{
 		Username: req.Username,
 		Email:    req.Email,
 		Password: string(hashedPassword),
@@ -123,7 +91,7 @@ func (s *Service) RegisterUser(ctx context.Context, req *AuthRequest) (*User, er
 	return user, nil
 }
 
-func (s *Service) Authenticate(ctx context.Context, username, password string) (*User, error) {
+func (s *Service) Authenticate(ctx context.Context, username, password string) (*models.User, error) {
 	user, err := s.repo.GetUserByUsername(ctx, username)
 	if err != nil {
 		return nil, err
@@ -145,7 +113,7 @@ func NewHandler(svc *Service) *Handler {
 }
 
 func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
-	var req AuthRequest
+	var req models.AuthRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Invalid request", http.StatusBadRequest)
 		return
@@ -294,18 +262,18 @@ func exportOneAnimeToJSONByID(db *sql.DB, id int) ([]byte, error) {
 	return json.MarshalIndent(result, "", "  ")
 }
 
-func getAnimePaginated(db *sql.DB, offset, limit int) ([]Anime, error) {
+func getAnimePaginated(db *sql.DB, offset, limit int) ([]models.Anime, error) {
 	rows, err := db.Query("SELECT * FROM anime ORDER BY id LIMIT ? OFFSET ?", limit, offset)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	var animeList []Anime
+	var animeList []models.Anime
 	var updated time.Time
 
 	for rows.Next() {
-		var a Anime
+		var a models.Anime
 		var airedJSON []byte
 		var image sql.NullString
 
@@ -351,7 +319,7 @@ func getTotalAnimeCount(db *sql.DB) (int, error) {
 	return count, err
 }
 
-func searchAnimeByTitle(db *sql.DB, title string) ([]Anime, error) {
+func searchAnimeByTitle(db *sql.DB, title string) ([]models.Anime, error) {
 	query := `SELECT * FROM anime WHERE title LIKE ?`
 
 	rows, err := db.Query(query, "%"+title+"%")
@@ -360,10 +328,10 @@ func searchAnimeByTitle(db *sql.DB, title string) ([]Anime, error) {
 	}
 	defer rows.Close()
 
-	var animeList []Anime
+	var animeList []models.Anime
 	var updated time.Time
 	for rows.Next() {
-		var a Anime
+		var a models.Anime
 		var airedJSON []byte
 		var image sql.NullString
 		if err := rows.Scan(
