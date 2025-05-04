@@ -12,9 +12,9 @@ import (
 
 	"github.com/DimaChekashov/anifox-find/internal/handler"
 	"github.com/DimaChekashov/anifox-find/internal/models"
+	// "github.com/DimaChekashov/anifox-find/internal/parser"
 	_ "github.com/lib/pq"
 	"golang.org/x/crypto/bcrypt"
-	// "github.com/DimaChekashov/anifox-find/internal/parser"
 )
 
 // User repository
@@ -203,6 +203,8 @@ func main() {
 	}
 	defer db.Close()
 
+	// parser.ParseAnimeAndSaveToDB(db, 60)
+
 	http.HandleFunc("/anime", handler.HandleAnimeList(db))
 	http.HandleFunc("/anime/", handler.HandleSingleAnime(db))
 	http.HandleFunc("/anime/search", handler.HandleSearchAnime(db))
@@ -221,6 +223,4 @@ func main() {
 
 	log.Printf("Server start on http://localhost%s", server.Addr)
 	log.Fatal(server.ListenAndServe())
-
-	// parser.ParseAnimeAndSaveToDB(db, 60)
 }

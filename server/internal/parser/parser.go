@@ -108,15 +108,15 @@ func saveAnime(db *sql.DB, anime models.Anime) error {
 		aired,
 		synopsis,
 		updated
-	) VALUES (?, ?, ?, ?, ?, ?, ?)
+	) VALUES ($1, $2, $3, $4, $5, $6, $7)
 	ON CONFLICT(id) DO UPDATE SET
-		url = excluded.url,
-		title = excluded.title,
-		image = excluded.image,
-		episodes = excluded.episodes,
-		aired = excluded.aired,
-		synopsis = excluded.synopsis,
-		updated = excluded.updated`
+		url = EXCLUDED.url,
+		title = EXCLUDED.title,
+		image = EXCLUDED.image,
+		episodes = EXCLUDED.episodes,
+		aired = EXCLUDED.aired,
+		synopsis = EXCLUDED.synopsis,
+		updated = EXCLUDED.updated`
 
 	_, err = db.Exec(query,
 		anime.URL,
