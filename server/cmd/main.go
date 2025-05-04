@@ -12,7 +12,7 @@ import (
 
 	"github.com/DimaChekashov/anifox-find/internal/handler"
 	"github.com/DimaChekashov/anifox-find/internal/models"
-	_ "github.com/mattn/go-sqlite3"
+	_ "github.com/lib/pq"
 	"golang.org/x/crypto/bcrypt"
 	// "github.com/DimaChekashov/anifox-find/internal/parser"
 )
@@ -129,24 +129,14 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 
 // DB
 func initDB() (*sql.DB, error) {
-	db, err := sql.Open("sqlite3", "anime.db")
+	connStr := "postgres://postgres:qwerty@localhost:5432/anifox?sslmode=disable"
+	db, err := sql.Open("postgres", connStr)
 	if err != nil {
 		return nil, fmt.Errorf("error opening DB: %w", err)
 	}
 
-	_, err = db.Exec(`
-	CREATE TABLE IF NOT EXISTS anime (
-		id INTEGER PRIMARY KEY AUTOINCREMENT,
-		url TEXT,
-		title TEXT NOT NULL,
-		image TEXT,
-		episodes INTEGER,
-		aired TEXT,
-		synopsis TEXT,
-		updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-	)`)
-	if err != nil {
-		return nil, fmt.Errorf("error creating table: %w", err)
+	if err = db.Ping(); err != nil {
+		return nil, fmt.Errorf("error connecting to DB: %w", err)
 	}
 
 	return db, nil
