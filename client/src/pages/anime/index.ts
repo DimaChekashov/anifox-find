@@ -1,0 +1,1 @@
+export { default as AnimePage } from "./ui/AnimePage";

@@ -1,0 +1,1 @@
+export { AnimePage as default } from "@/pages/anime";
