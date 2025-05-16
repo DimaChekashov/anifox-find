@@ -3,8 +3,8 @@ import React from "react";
 
 const links = [
     {href: "/", label: "Home"},
-    {href: "/blog", label: "Blog"},
-    {href: "/portfolio", label: "Portfolio"}
+    {href: "/anime", label: "Anime"},
+    {href: "/profile", label: "Profile"}
 ];
 
 const Header: React.FC = () => {
