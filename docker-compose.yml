@@ -1,6 +1,18 @@
-version: '3.8'
-
 services:
+#    go-backend:
+#        build: ./server
+#        ports:
+#            - "8080:8080"
+#        depends_on:
+#            - postgres
+#    nextjs:
+#        build: ./client
+#        ports:
+#            - "3000:3000"
+#        environment:
+#            - NEXT_PUBLIC_API_URL=http://localhost:8080
+#        depends_on:
+#            - go-backend
     migrate:
         image: migrate/migrate
         volumes:
