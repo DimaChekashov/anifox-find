@@ -1,3 +1,4 @@
+import Link from "next/link";
 import {AnimeType} from "../model/types";
 
 export default async function Anime() {
@@ -9,7 +10,11 @@ export default async function Anime() {
       <h1>Anime Catalog</h1>
       <ul>
         {response.data?.map((anime: AnimeType) => (
-          <li key={anime.mal_id}>{anime.title}</li>
+          <li key={anime.mal_id}>
+            <Link href={`/anime/${anime.mal_id}`}>
+              {anime.title}
+            </Link>
+          </li>
         ))}
       </ul>
     </div>
