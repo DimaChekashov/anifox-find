@@ -116,7 +116,7 @@ func exportOneAnimeToJSONByID(db *sql.DB, id int) ([]byte, error) {
 			synopsis,
 			updated
 		FROM anime
-		WHERE ID = ?
+		WHERE ID = $1
 	`, id)
 
 	columns := []string{"id", "url", "title", "image", "episodes", "aired", "synopsis", "updated"}
